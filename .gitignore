@@ -4,3 +4,4 @@ __pycache__/
 .env
 vt_cache.json
 abuseipdb_cache.json
+.codex/
