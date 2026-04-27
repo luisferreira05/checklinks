@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t("page_title") }}</title>
+     <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+    <style>
+        :root {
+            --page-bg: #f6f8fb;
+            --panel-bg: rgba(255, 255, 255, 0.86);
+            --text: #152033;
+            --muted: #64748b;
+            --border: #d9e1ec;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --shadow: 0 18px 50px rgba(15, 23, 42, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            color: var(--text);
+            background: var(--page-bg);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            transition: all 0.4s ease;
+        }
+
+        body.safe {
+            background-color: #d4edda;
+        }
+
+        body.warning {
+            background-color: #fff3cd;
+        }
+
+        body.danger {
+            background-color: #f8d7da;
+        }
+
+        .language-switcher {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            z-index: 10;
+        }
+
+        .language-switcher select {
+            min-height: 40px;
+            padding: 0 36px 0 14px;
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+            font: inherit;
+            font-size: 0.92rem;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+        }
+
+        .language-switcher select:focus,
+        .language-switcher select:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12), 0 12px 28px rgba(15, 23, 42, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .page {
+            width: min(920px, calc(100% - 32px));
+            min-height: 100vh;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 28px;
+            padding: 48px 0;
+        }
+
+        .checker {
+            width: 100%;
+            padding: clamp(24px, 5vw, 44px);
+            background: var(--panel-bg);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            border-radius: 28px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(18px);
+            transition: all 0.4s ease;
+            animation: rise-in 550ms ease both;
+        }
+
+        .intro {
+            max-width: 620px;
+            margin: 0 auto 28px;
+            text-align: center;
+        }
+
+        .intro h1 {
+            margin: 0 0 10px;
+            font-size: clamp(2rem, 6vw, 4rem);
+            line-height: 1;
+            letter-spacing: 0;
+        }
+
+        .intro p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+
+        .check-form {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 12px;
+            max-width: 720px;
+            margin: 0 auto;
+        }
+
+        .check-form input {
+            width: 100%;
+            min-height: 58px;
+            padding: 0 20px;
+            color: var(--text);
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            box-shadow: 0 10px 26px rgba(15, 23, 42, 0.07);
+            font: inherit;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+        }
+
+        .check-form input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14), 0 14px 30px rgba(15, 23, 42, 0.09);
+            transform: translateY(-1px);
+        }
+
+        .check-form button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            min-height: 58px;
+            padding: 0 28px;
+            color: #ffffff;
+            background: var(--accent);
+            border: 0;
+            border-radius: 999px;
+            box-shadow: 0 14px 28px rgba(37, 99, 235, 0.28);
+            font: inherit;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.4s ease;
+        }
+
+        .check-form button:hover {
+            background: var(--accent-hover);
+            box-shadow: 0 18px 34px rgba(37, 99, 235, 0.36);
+            transform: translateY(-2px);
+        }
+
+        .check-form button:active {
+            transform: translateY(0);
+        }
+                
+        .check-form button.is-loading {
+            cursor: wait;
+            opacity: 0.88;
+        }
+
+        .spinner {
+            display: none;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.45);
+            border-top-color: #ffffff;
+            border-radius: 50%;
+            animation: spin 800ms linear infinite;
+        }
+
+        .check-form button.is-loading .spinner {
+            display: inline-block;
+        }
+
+        .results {
+            display: grid;
+            gap: 16px;
+            animation: result-in 520ms ease both;
+        }
+
+        .status-title {
+            display: flex;
+            justify-content: center;
+            margin: 0 0 18px;
+            text-align: center;
+            font-size: clamp(1.7rem, 5vw, 3rem);
+            line-height: 1.1;
+            letter-spacing: 0;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            max-width: 100%;
+            padding: 14px 22px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            color: var(--text);
+            background: #f8fafc;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+            overflow-wrap: anywhere;
+            transition: all 0.4s ease;
+        }
+
+        .status-badge.status-safe {
+            color: #14532d;
+            background: #dcfce7;
+            border-color: #86efac;
+        }
+
+        .status-badge.status-warning {
+            color: #713f12;
+            background: #fef3c7;
+            border-color: #fde68a;
+        }
+
+        .status-badge.status-danger {
+            color: #7f1d1d;
+            background: #fee2e2;
+            border-color: #fecaca;
+        }
+
+        .link-analisado {
+            max-width: 620px;
+            margin: 12px auto 0;
+            text-align: center;
+            font-size: 0.85rem;
+            color: #64748b;
+            line-height: 1.4;
+            word-break: break-all;
+        }
+
+        .link-analisado span {
+            display: block;
+            margin-bottom: 2px;
+            font-size: 0.75rem;
+            opacity: 0.7;
+            word-break: normal;
+        }
+
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+            gap: 16px;
+        }
+
+        .result-section {
+            padding: 20px;
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+            transition: all 0.4s ease;
+        }
+
+        .result-summary {
+            text-align: center;
+        }
+
+        .result-summary h2 {
+            color: var(--muted);
+        }
+
+        .risk-score {
+            margin: 0 0 10px;
+            color: var(--text);
+            font-size: 1.25rem;
+            letter-spacing: 0;
+        }
+        .risk-explanation {
+            .score-text {
+                text-align: center;
+                width: 100%;
+            }
+        }
+
+        .result-section h2 {
+            margin: 0 0 14px;
+            font-size: 1rem;
+            letter-spacing: 0;
+        }
+
+        .result-section p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .clean-message {
+            color: #166534;
+            font-weight: 700;
+        }
+
+        .result-list {
+            display: grid;
+            gap: 12px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .result-list li {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .result-list span {
+            flex: 0 0 auto;
+        }
+
+        @keyframes rise-in {
+            from {
+                opacity: 0;
+                transform: translateY(16px) scale(0.99);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Animation: results fade in with a small upward slide and scale for clearer feedback. */
+        @keyframes result-in {
+            from {
+                opacity: 0;
+                transform: translateY(18px) scale(0.98);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 720px) {
+            .language-switcher {
+                top: 12px;
+                right: 12px;
+            }
+
+            .language-switcher select {
+                min-height: 36px;
+                max-width: 150px;
+                font-size: 0.86rem;
+            }
+
+            .page {
+                width: min(100% - 24px, 920px);
+                padding: 28px 0;
+            }
+
+            .checker {
+                border-radius: 22px;
+            }
+
+            .check-form,
+            .result-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .check-form button {
+                width: 100%;
+            }
+
+        }
+    </style>
+</head>
+<body data-status-key="{{ status_key|default('', true) }}">
+    <div class="language-switcher">
+        <select id="language-select" aria-label="{{ t('language_selector') }}">
+            <option value="en" {% if lang == "en" %}selected{% endif %}>🇬🇧 {{ t("language_en") }}</option>
+            <option value="pt" {% if lang == "pt" %}selected{% endif %}>🇵🇹 {{ t("language_pt") }}</option>
+            <option value="es" {% if lang == "es" %}selected{% endif %}>🇪🇸 {{ t("language_es") }}</option>
+        </select>
+    </div>
+
+    <main class="page">
+        <section class="checker" aria-labelledby="page-title">
+            <div class="intro">
+                <h1 id="page-title">{{ t("title") }}</h1>
+                <p>{{ t("subtitle") }}</p>
+            </div>
+
+            <!-- Flask posts this form to the /check route for analysis. -->
+            <form class="check-form" method="POST" action="/check">
+                <input type="hidden" name="lang" value="{{ lang }}">
+                <input
+                    type="text"
+                    name="url"
+                    value="{{ url|default('', true) }}"
+                    placeholder="{{ t('input_placeholder') }}"
+                    autocomplete="url"
+                    inputmode="url"
+                    required
+                >
+                <button type="submit" data-checking-text="{{ t('checking_text') }}">
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span class="button-label">{{ t("button_text") }}</span>
+                </button>
+            </form>
+        </section>
+
+        {% if status %}
+            <!-- Section structure: results are split into Result, Problems, and Information cards. -->
+            <section class="results" id="results" aria-live="polite">
+                <section class="result-section result-summary" aria-labelledby="result-title">
+                    <h2 id="result-title">{{ t("result_title") }}</h2>
+                    <div class="status-title">
+                        <span class="status-badge" data-status-output>{{ status }}</span>
+                    </div>
+                    <h3 class="risk-score">{{ t("security_score") }}: {{ risk_score }}/100</h3>
+                    {% if risk_explanation %}
+                        <p class="risk-explanation">{{ risk_explanation }}</p>
+                    {% endif %}
+                    <div class="link-analisado">
+                        <span>{{ t("analyzed_link") }}</span>
+                        {{ url }}
+                    </div>
+                </section>
+
+                <div class="result-grid">
+                    <section class="result-section" aria-labelledby="problems-title">
+                        <h2 id="problems-title">{{ t("problems_found") }}</h2>
+
+                        {% if problems %}
+                            <ul class="result-list">
+                                {% for problem in problems %}
+                                    <li><span aria-hidden="true">⚠️</span>{{ problem }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p class="clean-message">{{ t("no_issues") }}</p>
+                        {% endif %}
+                    </section>
+
+                    {% if info %}
+                        <section class="result-section" aria-labelledby="info-title">
+                            <h2 id="info-title">{{ t("information") }}</h2>
+                            <ul class="result-list">
+                                {% for i in info %}
+                                    <li><span data-info-icon aria-hidden="true">ℹ️</span>{{ i }}</li>
+                                {% endfor %}
+                            </ul>
+                        </section>
+                    {% endif %}
+                </div>
+            </section>
+        {% endif %}
+    </main>
+
+    <script>
+        // Status color logic uses a language-independent key from Flask.
+        const statusKey = document.body.dataset.statusKey || "";
+        const statusClasses = {
+            safe: "safe",
+            warning: "warning",
+            danger: "danger"
+        };
+
+        const languageSelect = document.getElementById("language-select");
+        const checkForm = document.querySelector(".check-form");
+        const submitButton = checkForm.querySelector("button");
+        const buttonLabel = submitButton.querySelector(".button-label");
+        const hiddenLanguageInput = checkForm.querySelector('input[name="lang"]');
+        const checkingText = submitButton.dataset.checkingText || "Checking...";
+
+        function applyStatusColor() {
+            const statusOutput = document.querySelector("[data-status-output]");
+
+            document.body.classList.remove(statusClasses.safe, statusClasses.warning, statusClasses.danger);
+
+            if (statusOutput) {
+                statusOutput.classList.remove("status-safe", "status-warning", "status-danger");
+            }
+
+            if (statusKey === "low") {
+                document.body.classList.add(statusClasses.safe);
+                statusOutput?.classList.add("status-safe");
+            } else if (statusKey === "suspicious") {
+                document.body.classList.add(statusClasses.warning);
+                statusOutput?.classList.add("status-warning");
+            } else if (statusKey === "danger") {
+                document.body.classList.add(statusClasses.danger);
+                statusOutput?.classList.add("status-danger");
+            }
+        }
+
+        function getInfoIcon(text) {
+            const normalizedText = text.toLowerCase();
+
+            if (
+                normalizedText.includes("ssl") ||
+                normalizedText.includes("tls") ||
+                normalizedText.includes("https") ||
+                normalizedText.includes("certificado") ||
+                normalizedText.includes("certificate")
+            ) {
+                return "🔐";
+            }
+
+            if (
+                normalizedText.includes("whois") ||
+                normalizedText.includes("domain") ||
+                normalizedText.includes("domínio") ||
+                normalizedText.includes("dominio")
+            ) {
+                return "🌐";
+            }
+
+            return "ℹ️";
+        }
+
+        function decorateInfoIcons() {
+            document.querySelectorAll("[data-info-icon]").forEach((icon) => {
+                icon.textContent = getInfoIcon(icon.parentElement.textContent);
+            });
+        }
+
+        // Language switcher behavior: reload through Flask so dynamic messages use the same language.
+        languageSelect.addEventListener("change", (event) => {
+            const selectedLanguage = event.target.value;
+            localStorage.setItem("preferredLanguage", selectedLanguage);
+            hiddenLanguageInput.value = selectedLanguage;
+            window.location.href = `/?lang=${encodeURIComponent(selectedLanguage)}`;
+        });
+
+        checkForm.addEventListener("submit", () => {
+            submitButton.classList.add("is-loading");
+            submitButton.disabled = true;
+            buttonLabel.textContent = checkingText;
+        });
+
+        // After Flask renders a result, move the user directly to the feedback area.
+        window.addEventListener("DOMContentLoaded", () => {
+            const results = document.getElementById("results");
+            decorateInfoIcons();
+
+            if (results) {
+                setTimeout(applyStatusColor, 80);
+                setTimeout(() => {
+                    results.scrollIntoView({ behavior: "smooth", block: "start" });
+                }, 150);
+            }
+        });
+    </script>
+</body>
+</html>
