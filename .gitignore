@@ -5,3 +5,5 @@ __pycache__/
 vt_cache.json
 abuseipdb_cache.json
 .codex/
+*.json
+projeto/venv/
