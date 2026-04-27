@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+*.pyc
+.env
+vt_cache.json
+abuseipdb_cache.json
