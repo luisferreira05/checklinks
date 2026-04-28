@@ -1,16 +1,16 @@
-import datetime  # para calcular a idade do domínio
 import json
 import os
 import re
 import socket
 import ssl
-import subprocess  # para executar o comando whois no sistema
 import threading
 import time
 from collections import deque
+from datetime import datetime
 from urllib.parse import urlparse
 
 import requests  # para consultar a API do VirusTotal
+import whois
 from flask import Flask, render_template, request
 
 
@@ -90,7 +90,7 @@ translations = {
         "invalid_url": "O link parece inválido.",
         "suspicious_domain_format": "O nome do site parece estranho ou imitado (possível phishing).",
         "domain_created": "Domínio criado em {date} ({age} dias)",
-        "domain_recent": "Domínio muito recente (menos de 6 meses). Possível phishing.",
+        "domain_recent": "Domínio recente. Possível phishing.",
         "whois_timeout": "A verificação WHOIS demorou demasiado tempo.",
         "whois_failed": "Não foi possível concluir a verificação WHOIS.",
         "ssl_valid": "Certificado SSL válido.",
@@ -137,7 +137,7 @@ translations = {
         "invalid_url": "The link appears to be invalid.",
         "suspicious_domain_format": "The site name looks unusual or imitated (possible phishing).",
         "domain_created": "Domain created on {date} ({age} days)",
-        "domain_recent": "Domain is very recent (less than 6 months). Possible phishing.",
+        "domain_recent": "Domain is recent. Possible phishing.",
         "whois_timeout": "The WHOIS check took too long.",
         "whois_failed": "The WHOIS check could not be completed.",
         "ssl_valid": "Valid SSL certificate.",
@@ -184,7 +184,7 @@ translations = {
         "invalid_url": "El enlace parece inválido.",
         "suspicious_domain_format": "El nombre del sitio parece extraño o imitado (posible phishing).",
         "domain_created": "Dominio creado el {date} ({age} días)",
-        "domain_recent": "Dominio muy reciente (menos de 6 meses). Posible phishing.",
+        "domain_recent": "Dominio reciente. Posible phishing.",
         "whois_timeout": "La comprobación WHOIS tardó demasiado.",
         "whois_failed": "No se pudo completar la comprobación WHOIS.",
         "ssl_valid": "Certificado SSL válido.",
@@ -234,6 +234,45 @@ def normalize_domain(netloc):
 
 def is_valid_domain(domain):
     return bool(domain and "." in domain and re.fullmatch(r"[a-z0-9.-]+", domain))
+
+
+def normalize_whois_creation_date(creation_date):
+    if creation_date is None:
+        return None
+
+    if isinstance(creation_date, list):
+        valid_dates = [
+            item.replace(tzinfo=None)
+            for item in creation_date
+            if isinstance(item, datetime)
+        ]
+        return min(valid_dates) if valid_dates else None
+
+    if isinstance(creation_date, datetime):
+        return creation_date.replace(tzinfo=None)
+
+    return None
+
+
+def check_whois(domain):
+    try:
+        whois_data = whois.whois(domain)
+    except Exception:
+        return False, "WHOIS unavailable"
+
+    if isinstance(whois_data, dict):
+        raw_creation_date = whois_data.get("creation_date")
+    else:
+        raw_creation_date = getattr(whois_data, "creation_date", None)
+
+    creation_date = normalize_whois_creation_date(raw_creation_date)
+    if creation_date is None:
+        return False, "Creation date not available"
+
+    if creation_date > datetime(2020, 1, 1):
+        return True, "Domain is recent"
+
+    return False, "Domain is not recent"
 
 
 def load_persistent_virustotal_cache():
@@ -678,36 +717,18 @@ def check():
         risk_score -= 10
         problems.append(t("suspicious_domain_format", lang))
 
-    # WHOIS local: ajuda a decidir se vale a pena consultar serviços externos.
+    # WHOIS via biblioteca Python, compatível com ambientes cloud sem binário whois.
     if not invalid_url:
-        try:
-            result = subprocess.run(
-                ["whois", domain],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            output = result.stdout
+        is_recent, whois_message = check_whois(domain)
 
-            match = re.search(r"(Creation Date|created):\s*([0-9\-T:\.Z]+)", output, re.IGNORECASE)
-            if match:
-                creation_str = match.group(2).replace("Z", "")
-                creation_date = datetime.datetime.strptime(creation_str, "%Y-%m-%dT%H:%M:%S")
-                age = (datetime.datetime.now() - creation_date).days
-
-    
-
-                info.append(t("domain_created", lang).format(date=creation_date.date(), age=age))
-
-                if age < 180:
-                    score += 1
-                    risk_score -= 10
-                    problems.append(t("domain_recent", lang))
-        except subprocess.TimeoutExpired:
-            info.append(t("whois_timeout", lang))
-        except Exception as error:
-            print("Erro WHOIS:", error)
+        if is_recent:
+            score += 1
+            risk_score -= 10
+            problems.append(t("domain_recent", lang))
+        elif whois_message == "WHOIS unavailable":
             info.append(t("whois_failed", lang))
+        else:
+            info.append(whois_message)
 
     if not invalid_url:
         if ssl_check_advanced(domain):
