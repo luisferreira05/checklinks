@@ -23,7 +23,9 @@ DNS & Security: Cloudflare
 APIs:
 AbuseIPDB
 VirusTotal
+
 📦 Installation (Local)
+
 git clone https://github.com/luisferreira05/checklinks.git
 cd checklinks
 
