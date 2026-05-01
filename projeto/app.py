@@ -757,8 +757,17 @@ def check():
                 score += 1
                 risk_score -= 15
                 problems.append(t("virustotal_suspicious", lang))
-        else:
-            info.append(t("virustotal_unavailable", lang))
+        elif vt_stats is None or vt_result["status"] == "indisponivel":
+            # Modo degradado de segurança: se o VirusTotal estiver indisponível,
+            # aplicamos "fail closed" e tornamos os sinais locais mais rigorosos.
+            existing_problem_count = len(problems)
+            score += 1
+            risk_score -= 10
+            if existing_problem_count > 0:
+                extra_penalty = existing_problem_count * 2
+                risk_score -= extra_penalty
+            if existing_problem_count >= 2:
+                risk_score = min(risk_score, 79)
 
             # Fallback: se o VirusTotal falhar, consultamos o Google Safe Browsing
             # para manter uma segunda camada de deteção sem alterar a lógica principal.
@@ -827,4 +836,4 @@ def check():
 
 
 if __name__ == "__main__":
-        app.run(host="0.0.0.0", port=int(os.environ.get("PORT")))
+        app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

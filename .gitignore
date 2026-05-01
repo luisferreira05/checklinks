@@ -7,3 +7,4 @@ abuseipdb_cache.json
 .codex/
 *.json
 projeto/venv/
+.codex
