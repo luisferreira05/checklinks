@@ -38,6 +38,43 @@ ABUSEIPDB_CACHE_TTL_SECONDS = 3600  # 1 hora
 ABUSEIPDB_CACHE_MAX_ENTRIES = 1000
 ABUSEIPDB_CACHE_FILE = os.path.join(os.path.dirname(__file__), "abuseipdb_cache.json")
 
+BRAND_KEYWORDS = [
+    "paypal",
+    "visa",
+    "mastercard",
+    "mbway",
+    "revolut",
+    "wise",
+    "dhl",
+    "fedex",
+    "ups",
+    "gls",
+    "ctt",
+    "dpd",
+    "usps",
+    "google",
+    "apple",
+    "microsoft",
+    "amazon",
+    "icloud",
+    "outlook",
+    "facebook",
+    "instagram",
+    "whatsapp",
+    "twitter",
+    "tiktok",
+    "linkedin",
+    "netflix",
+    "spotify",
+    "disney",
+    "primevideo",
+    "ebay",
+    "aliexpress",
+    "olx",
+]
+
+SUSPICIOUS_KEYWORDS = ["login", "verify", "secure", "account", "update"]
+
 # Rate limiting por IP do cliente:
 # - 2 segundos mínimos entre pedidos para travar spam imediato
 # - 8 pedidos por minuto para impedir abuso sem afetar uso normal
@@ -91,6 +128,7 @@ translations = {
         "suspicious_domain_format": "O nome do site parece estranho ou imitado (possível phishing).",
         "domain_created": "Domínio criado em {date} ({age} dias)",
         "domain_recent": "Domínio recente. Possível phishing.",
+        "recent_phishing_keywords": "Domínio recente combinado com marca ou palavras suspeitas → possível phishing",
         "whois_timeout": "A verificação WHOIS demorou demasiado tempo.",
         "whois_failed": "Não foi possível concluir a verificação WHOIS.",
         "ssl_valid": "Certificado SSL válido.",
@@ -138,6 +176,7 @@ translations = {
         "suspicious_domain_format": "The site name looks unusual or imitated (possible phishing).",
         "domain_created": "Domain created on {date} ({age} days)",
         "domain_recent": "Domain is recent. Possible phishing.",
+        "recent_phishing_keywords": "Recent domain combined with brand or suspicious keywords → possible phishing",
         "whois_timeout": "The WHOIS check took too long.",
         "whois_failed": "The WHOIS check could not be completed.",
         "ssl_valid": "Valid SSL certificate.",
@@ -185,6 +224,7 @@ translations = {
         "suspicious_domain_format": "El nombre del sitio parece extraño o imitado (posible phishing).",
         "domain_created": "Dominio creado el {date} ({age} días)",
         "domain_recent": "Dominio reciente. Posible phishing.",
+        "recent_phishing_keywords": "Dominio reciente combinado con marca o palabras sospechosas → posible phishing",
         "whois_timeout": "La comprobación WHOIS tardó demasiado.",
         "whois_failed": "No se pudo completar la comprobación WHOIS.",
         "ssl_valid": "Certificado SSL válido.",
@@ -722,9 +762,19 @@ def check():
         is_recent, whois_message = check_whois(domain)
 
         if is_recent:
-            score += 1
-            risk_score -= 10
+            score += 2
+            risk_score -= 20
             problems.append(t("domain_recent", lang))
+
+            has_brand_keyword = any(keyword in domain for keyword in BRAND_KEYWORDS)
+            has_suspicious_keyword = any(
+                keyword in domain for keyword in SUSPICIOUS_KEYWORDS
+            )
+
+            if has_brand_keyword or (has_brand_keyword and has_suspicious_keyword):
+                score += 1
+                risk_score -= 10
+                problems.append(t("recent_phishing_keywords", lang))
         elif whois_message == "WHOIS unavailable":
             info.append(t("whois_failed", lang))
         else:
@@ -750,7 +800,7 @@ def check():
             suspicious = vt_stats.get("suspicious", 0)
 
             if malicious > 3:  # limiar mais alto para evitar falsos positivos
-                score += 2
+                score += doma
                 risk_score -= 30
                 problems.append(t("virustotal_malicious", lang))
             elif malicious > 0 and suspicious > 0:
