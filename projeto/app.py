@@ -45,6 +45,7 @@ IP_DATA = {}
 IP_COOLDOWN_SECONDS = 2
 IP_RATE_LIMIT = 8
 IP_RATE_WINDOW_SECONDS = 60
+VERY_RECENT_DOMAIN_DAYS = 7
 
 # Rate limiter simples em memória.
 # Guardamos os timestamps das últimas chamadas reais ao VirusTotal
@@ -65,8 +66,13 @@ translations = {
         "title": "Verificador de Segurança de Sites",
         "subtitle": "Verifique sinais comuns de risco antes de visitar um link.",
         "input_placeholder": "Insira um link para verificar",
+        "message_source_question": "Recebeste este link por mensagem, email ou conversa?",
+        "message_source_yes": "Sim",
+        "message_source_no": "Não",
+        "message_source_not_sure": "Não sei",
         "button_text": "Verificar",
         "checking_text": "A verificar...",
+        "created_by": "Criado por Luís Ferreira",
         "language_selector": "Seletor de idioma",
         "language_en": "Inglês",
         "language_pt": "Português",
@@ -91,6 +97,11 @@ translations = {
         "suspicious_domain_format": "O nome do site parece estranho ou imitado (possível phishing).",
         "domain_created": "Domínio criado em {date} ({age} dias)",
         "domain_recent": "Domínio recente. Possível phishing.",
+        "domain_not_recent": "Domínio não recente.",
+        "domain_creation_unavailable": "Data de criação do domínio indisponível.",
+        "message_source_warning": "Links recebidos por mensagem, email ou chat são uma forma comum de phishing.",
+        "message_source_unsure_info": "Não foi possível confirmar a origem do link. Mantém cuidado se tiver chegado por mensagem, email ou chat.",
+        "message_source_recent_domain_warning": "Domínio muito recente e recebido por mensagem. Este é um forte sinal de possível phishing.",
         "whois_timeout": "A verificação WHOIS demorou demasiado tempo.",
         "whois_failed": "Não foi possível concluir a verificação WHOIS.",
         "ssl_valid": "Certificado SSL válido.",
@@ -112,8 +123,13 @@ translations = {
         "title": "Website Safety Checker",
         "subtitle": "Check a link for common warning signs before you visit.",
         "input_placeholder": "Enter a link to check",
+        "message_source_question": "Did this link come from a message, email, or chat?",
+        "message_source_yes": "Yes",
+        "message_source_no": "No",
+        "message_source_not_sure": "Not sure",
         "button_text": "Check",
         "checking_text": "Checking...",
+        "created_by": "Created by Luís Ferreira",
         "language_selector": "Language selector",
         "language_en": "English",
         "language_pt": "Portuguese",
@@ -138,6 +154,11 @@ translations = {
         "suspicious_domain_format": "The site name looks unusual or imitated (possible phishing).",
         "domain_created": "Domain created on {date} ({age} days)",
         "domain_recent": "Domain is recent. Possible phishing.",
+        "domain_not_recent": "Domain is not recent.",
+        "domain_creation_unavailable": "Domain creation date is unavailable.",
+        "message_source_warning": "Links received through messages, emails, or chats are a common phishing vector.",
+        "message_source_unsure_info": "The link source could not be confirmed. Stay cautious if it arrived through a message, email, or chat.",
+        "message_source_recent_domain_warning": "Very recent domain received through a message. This is a strong phishing warning sign.",
         "whois_timeout": "The WHOIS check took too long.",
         "whois_failed": "The WHOIS check could not be completed.",
         "ssl_valid": "Valid SSL certificate.",
@@ -159,8 +180,13 @@ translations = {
         "title": "Verificador de Seguridad de Sitios",
         "subtitle": "Comprueba señales comunes de riesgo antes de visitar un enlace.",
         "input_placeholder": "Introduce un enlace para comprobar",
+        "message_source_question": "¿Recibiste este enlace por mensaje, correo electrónico o chat?",
+        "message_source_yes": "Sí",
+        "message_source_no": "No",
+        "message_source_not_sure": "No lo sé",
         "button_text": "Comprobar",
         "checking_text": "Verificando...",
+        "created_by": "Creado por Luís Ferreira",
         "language_selector": "Selector de idioma",
         "language_en": "Inglés",
         "language_pt": "Portugués",
@@ -185,6 +211,11 @@ translations = {
         "suspicious_domain_format": "El nombre del sitio parece extraño o imitado (posible phishing).",
         "domain_created": "Dominio creado el {date} ({age} días)",
         "domain_recent": "Dominio reciente. Posible phishing.",
+        "domain_not_recent": "Dominio no reciente.",
+        "domain_creation_unavailable": "Fecha de creación del dominio no disponible.",
+        "message_source_warning": "Los enlaces recibidos por mensaje, correo electrónico o chat son una forma común de phishing.",
+        "message_source_unsure_info": "No se pudo confirmar el origen del enlace. Mantén la precaución si llegó por mensaje, correo electrónico o chat.",
+        "message_source_recent_domain_warning": "Dominio muy reciente recibido por mensaje. Esta es una señal fuerte de posible phishing.",
         "whois_timeout": "La comprobación WHOIS tardó demasiado.",
         "whois_failed": "No se pudo completar la comprobación WHOIS.",
         "ssl_valid": "Certificado SSL válido.",
@@ -258,7 +289,7 @@ def check_whois(domain):
     try:
         whois_data = whois.whois(domain)
     except Exception:
-        return False, "WHOIS unavailable"
+        return False, "whois_failed", None, None
 
     if isinstance(whois_data, dict):
         raw_creation_date = whois_data.get("creation_date")
@@ -267,12 +298,21 @@ def check_whois(domain):
 
     creation_date = normalize_whois_creation_date(raw_creation_date)
     if creation_date is None:
-        return False, "Creation date not available"
+        return False, "domain_creation_unavailable", None, None
+
+    age_days = max((datetime.utcnow() - creation_date).days, 0)
 
     if creation_date > datetime(2020, 1, 1):
-        return True, "Domain is recent"
+        return True, "domain_recent", age_days, creation_date
 
-    return False, "Domain is not recent"
+    return False, "domain_not_recent", age_days, creation_date
+
+
+def normalize_message_source(raw_value):
+    value = (raw_value or "no").strip().lower()
+    if value in {"yes", "no", "not_sure"}:
+        return value
+    return "no"
 
 
 def load_persistent_virustotal_cache():
@@ -685,6 +725,7 @@ def check():
         return rate_limit_message
 
     url = request.form.get("url", "").strip()
+    message_source = normalize_message_source(request.form.get("message_source"))
 
     if not url:
         return t("empty_url", lang)
@@ -698,6 +739,7 @@ def check():
     risk_score = 100
     problems = []
     info = []
+    domain_age_days = None
 
     domain = normalize_domain(parsed_url.netloc)
     invalid_url = parsed_url.scheme not in {"http", "https"} or not is_valid_domain(domain)
@@ -719,16 +761,34 @@ def check():
 
     # WHOIS via biblioteca Python, compatível com ambientes cloud sem binário whois.
     if not invalid_url:
-        is_recent, whois_message = check_whois(domain)
+        is_recent, whois_message_key, domain_age_days, creation_date = check_whois(domain)
 
         if is_recent:
             score += 1
             risk_score -= 10
             problems.append(t("domain_recent", lang))
-        elif whois_message == "WHOIS unavailable":
-            info.append(t("whois_failed", lang))
+        elif creation_date is not None and domain_age_days is not None:
+            info.append(
+                t("domain_created", lang).format(
+                    date=creation_date.strftime("%Y-%m-%d"),
+                    age=domain_age_days,
+                )
+            )
         else:
-            info.append(whois_message)
+            info.append(t(whois_message_key, lang))
+
+    if message_source == "yes":
+        score += 1
+        risk_score -= 10
+        problems.append(t("message_source_warning", lang))
+
+        if domain_age_days is not None and domain_age_days <= VERY_RECENT_DOMAIN_DAYS:
+            score += 2
+            risk_score -= 20
+            problems.append(t("message_source_recent_domain_warning", lang))
+    elif message_source == "not_sure":
+        risk_score -= 5
+        info.append(t("message_source_unsure_info", lang))
 
     if not invalid_url:
         if ssl_check_advanced(domain):
@@ -830,6 +890,7 @@ def check():
         risk_score=risk_score,
         risk_explanation=risk_explanation,
         url=url,
+        message_source=message_source,
         problems=problems,
         info=info,
     )
